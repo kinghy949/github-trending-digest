@@ -141,6 +141,14 @@ async function main(): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('通知发送失败:', message);
+      if (
+        typeof message === 'string' &&
+        (message.includes('ETIMEOUT') || message.includes('EDNS') || message.includes('queryA'))
+      ) {
+        console.error(
+          '提示：若为 DNS/连接超时，请检查网络或尝试：更换 DNS（如 114.114.114.114）、使用代理、或换网络后再试。'
+        );
+      }
       throw err;
     }
   }
