@@ -1,32 +1,39 @@
 /**
  * 邮件 HTML 模板 - 响应式、项目卡片、Star 数据
  */
+import type { TemplatePayload, TrendingProject } from './types/index.js';
 
-/**
- * @param {Object} data
- * @param {string} data.highlight - 今日亮点
- * @param {string} [data.categoryOverview] - 分类概览
- * @param {Array<{name: string, oneLiner?: string, category?: string, reason?: string}>} data.projects - 摘要项目列表
- * @param {Array<{name: string, stars?: number, starsToday?: string, language?: string, url?: string}>} [data.rawProjects] - 原始项目(用于链接/Star)
- * @param {string} [data.date] - 日期文案
- * @returns {string} HTML
- */
-export function generateEmailTemplate(data) {
-  const date = data.date || new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-  const rawMap = (data.rawProjects || []).reduce((acc, p) => {
-    acc[p.name] = p;
-    return acc;
-  }, {});
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-  const cards = (data.projects || []).map((p, i) => {
-    const raw = rawMap[p.name] || {};
-    const url = raw.url || `https://github.com/${p.name}`;
-    const stars = raw.stars != null ? raw.stars.toLocaleString() : '-';
-    const starsToday = raw.starsToday ? ` (↗️ ${raw.starsToday})` : '';
-    const lang = raw.language || p.category || '-';
-    const oneLiner = p.oneLiner || p.reason || '';
-    const reason = p.reason && p.reason !== oneLiner ? `<p class="reason">${escapeHtml(p.reason)}</p>` : '';
-    return `
+export function generateEmailTemplate(data: TemplatePayload): string {
+  const date =
+    data.date ||
+    new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  const rawMap = (data.rawProjects || []).reduce<Record<string, TrendingProject>>(
+    (acc, p) => {
+      acc[p.name] = p;
+      return acc;
+    },
+    {}
+  );
+
+  const cards = (data.projects || [])
+    .map((p, i) => {
+      const raw = rawMap[p.name] ?? {};
+      const url = raw.url || `https://github.com/${p.name}`;
+      const stars = raw.stars != null ? raw.stars.toLocaleString() : '-';
+      const starsToday = raw.starsToday ? ` (↗️ ${raw.starsToday})` : '';
+      const lang = raw.language || p.category || '-';
+      const oneLiner = p.oneLiner || p.reason || '';
+      const reason =
+        p.reason && p.reason !== oneLiner ? `<p class="reason">${escapeHtml(p.reason)}</p>` : '';
+      return `
     <div class="card">
       <div class="card-index">${i + 1}</div>
       <div class="card-body">
@@ -37,7 +44,8 @@ export function generateEmailTemplate(data) {
         <a href="${escapeHtml(url)}" class="link">查看项目 →</a>
       </div>
     </div>`;
-  }).join('');
+    })
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -95,25 +103,13 @@ export function generateEmailTemplate(data) {
 </html>`;
 }
 
-function escapeHtml(s) {
-  if (typeof s !== 'string') return '';
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/**
- * 生成纯文本摘要(供钉钉/Slack 等渠道使用)
- * @param {Object} data - 同 generateEmailTemplate
- * @returns {string}
- */
-export function generateTextSummary(data) {
-  const date = data.date || new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+export function generateTextSummary(data: TemplatePayload): string {
+  const date =
+    data.date ||
+    new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   let text = `📧 GitHub Trending Daily Digest\n📅 ${date}\n\n🔥 今日亮点\n${data.highlight || '暂无'}\n\n`;
   (data.projects || []).forEach((p, i) => {
-    const raw = (data.rawProjects || []).find(r => r.name === p.name);
+    const raw = (data.rawProjects || []).find((r) => r.name === p.name);
     const url = raw?.url || `https://github.com/${p.name}`;
     text += `${i + 1}. ${p.name} ${raw?.starsToday ? raw.starsToday : ''}\n   ${p.oneLiner || ''}\n   ${url}\n\n`;
   });

@@ -1,13 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SummarizerBase } from './base.js';
+import type {
+  SummaryProject,
+  SummaryResult,
+  SummarizerOptions,
+} from '../types/index.js';
 
 export class ClaudeSummarizer extends SummarizerBase {
-  constructor() {
-    super();
-    this._client = null;
-  }
+  private _client: Anthropic | null = null;
 
-  get client() {
+  get client(): Anthropic {
     if (!this._client) {
       const key = process.env.ANTHROPIC_API_KEY;
       if (!key) throw new Error('缺少环境变量 ANTHROPIC_API_KEY');
@@ -16,24 +18,23 @@ export class ClaudeSummarizer extends SummarizerBase {
     return this._client;
   }
 
-  /**
-   * @param {import('./base.js').SummaryProject[]} projects
-   * @param {import('./base.js').SummarizerOptions} options
-   * @returns {Promise<import('./base.js').SummaryResult>}
-   */
-  async generateSummary(projects, options = {}) {
+  async generateSummary(
+    projects: SummaryProject[],
+    options: SummarizerOptions = {}
+  ): Promise<SummaryResult> {
     const language = options.language || process.env.SUMMARY_LANGUAGE || 'zh-CN';
-    const maxProjects = options.maxProjects || Math.min(projects.length, 15);
+    const maxProjects = options.maxProjects ?? Math.min(projects.length, 15);
     const list = projects.slice(0, maxProjects);
 
-    const langInstruction = language === 'zh-CN'
-      ? '请用简体中文回答。'
-      : 'Please respond in English.';
+    const langInstruction =
+      language === 'zh-CN' ? '请用简体中文回答。' : 'Please respond in English.';
 
-    const projectListText = list.map((p, i) => {
-      const line = `${i + 1}. ${p.name} | ${p.language || '-'} | ⭐ ${p.stars ?? '-'} | ${p.description || '无描述'}`;
-      return line;
-    }).join('\n');
+    const projectListText = list
+      .map(
+        (p, i) =>
+          `${i + 1}. ${p.name} | ${p.language || '-'} | ⭐ ${p.stars ?? '-'} | ${p.description || '无描述'}`
+      )
+      .join('\n');
 
     const prompt = `你是一位技术编辑，需要根据以下 GitHub Trending 项目列表，生成一份简洁的每日摘要。
 
@@ -67,19 +68,21 @@ ${projectListText}
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const text = response.content?.[0]?.type === 'text'
-      ? response.content[0].text
-      : '';
+    const content = response.content;
+    const textBlock = Array.isArray(content)
+      ? content.find((b): b is { type: 'text'; text: string } => b.type === 'text')
+      : null;
+    const text = textBlock?.text ?? '';
     const cleaned = text.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/m, '$1').trim();
-    let data;
+    let data: { highlight?: string; categoryOverview?: string; projects?: SummaryResult['projects'] };
     try {
-      data = JSON.parse(cleaned);
-    } catch (e) {
+      data = JSON.parse(cleaned) as typeof data;
+    } catch {
       throw new Error('Claude 返回内容无法解析为 JSON: ' + text.slice(0, 200));
     }
 
     return {
-      highlight: data.highlight || '',
+      highlight: data.highlight ?? '',
       categoryOverview: data.categoryOverview,
       projects: Array.isArray(data.projects) ? data.projects : [],
     };

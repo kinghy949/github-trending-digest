@@ -5,7 +5,7 @@
     "since": "daily"
   },
   "summarizer": {
-    "provider": "claude",
+    "provider": "minimax",
     "language": "zh-CN",
     "maxProjectsInPrompt": 15
   },

@@ -1,13 +1,12 @@
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import { NotifierBase } from './base.js';
+import type { NotifyContent, NotifyOptions } from '../types/index.js';
 
 export class EmailNotifier extends NotifierBase {
-  constructor() {
-    super();
-    this._transporter = null;
-  }
+  private _transporter: Transporter | null = null;
 
-  get transporter() {
+  get transporter(): Transporter {
     if (!this._transporter) {
       const user = process.env.EMAIL_USER;
       const pass = process.env.EMAIL_PASS;
@@ -22,15 +21,11 @@ export class EmailNotifier extends NotifierBase {
     return this._transporter;
   }
 
-  isConfigured() {
+  isConfigured(): boolean {
     return !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
   }
 
-  /**
-   * @param {import('./base.js').NotifyContent} content
-   * @param {import('./base.js').NotifyOptions} options
-   */
-  async send(content, options = {}) {
+  async send(content: NotifyContent, options: NotifyOptions = {}): Promise<void> {
     const recipient = options.recipient || process.env.RECIPIENT_EMAIL;
     if (!recipient) throw new Error('未指定收件人: RECIPIENT_EMAIL 或 options.recipient');
 

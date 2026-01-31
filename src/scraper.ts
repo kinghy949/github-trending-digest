@@ -3,41 +3,34 @@
  */
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import type { TrendingProject } from './types/index.js';
 
 const BASE_URL = 'https://github.com';
+const DEFAULT_TIMEOUT_MS = 60000; // 60 秒，国内访问 GitHub 可能较慢
 
-/**
- * @typedef {Object} TrendingProject
- * @property {string} name - 项目名 owner/repo
- * @property {string} description - 描述
- * @property {number} stars - Star 数
- * @property {number} forks - Fork 数
- * @property {string} starsToday - 今日新增 Star 文案(如 +456)
- * @property {string} language - 主要编程语言
- * @property {string} url - 项目链接
- */
-
-/**
- * 抓取 GitHub Trending 列表
- * @param {string} [language=''] - 编程语言(空为全部)
- * @param {string} [since='daily'] - 时间范围 daily | weekly | monthly
- * @param {number} [maxProjects=10] - 最大项目数
- * @returns {Promise<TrendingProject[]>}
- */
-export async function fetchTrending(language = '', since = 'daily', maxProjects = 10) {
+export async function fetchTrending(
+  language = '',
+  since = 'daily',
+  maxProjects = 10
+): Promise<TrendingProject[]> {
   const path = language ? `/trending/${encodeURIComponent(language)}` : '/trending';
   const url = `${BASE_URL}${path}?since=${since}`;
+  const timeoutMs =
+    typeof process.env.SCRAPER_TIMEOUT_MS !== 'undefined'
+      ? parseInt(process.env.SCRAPER_TIMEOUT_MS, 10)
+      : DEFAULT_TIMEOUT_MS;
 
-  const { data: html } = await axios.get(url, {
+  const { data: html } = await axios.get<string>(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept-Language': 'en-US,en;q=0.9',
     },
-    timeout: 15000,
+    timeout: Number.isNaN(timeoutMs) ? DEFAULT_TIMEOUT_MS : Math.max(5000, timeoutMs),
   });
 
   const $ = cheerio.load(html);
-  const items = [];
+  const items: TrendingProject[] = [];
   const articleSelector = 'article.Box-row';
 
   $(articleSelector).each((i, el) => {
@@ -48,10 +41,10 @@ export async function fetchTrending(language = '', since = 'daily', maxProjects 
     const name = link.replace(/^\//, '').trim();
     const description = $el.find('p').first().text().trim();
     const langEl = $el.find('[itemprop="programmingLanguage"]');
-    const language = langEl.length ? langEl.text().trim() : '';
+    const lang = langEl.length ? langEl.text().trim() : '';
 
-    const links = $el.find('a[href*="/stargazers"]');
-    const starsText = links.length ? $(links[0]).text().trim().replace(/,/g, '') : '0';
+    const starLinks = $el.find('a[href*="/stargazers"]');
+    const starsText = starLinks.length ? $(starLinks[0]).text().trim().replace(/,/g, '') : '0';
     const stars = parseInt(starsText, 10) || 0;
 
     const forkLink = $el.find('a[href*="?type=fork"]');
@@ -66,7 +59,7 @@ export async function fetchTrending(language = '', since = 'daily', maxProjects 
       if (match) starsToday = '+' + match[0].replace(/,/g, '');
     }
 
-    const url = name ? `${BASE_URL}/${name}` : '';
+    const projectUrl = name ? `${BASE_URL}/${name}` : '';
 
     items.push({
       name,
@@ -74,8 +67,8 @@ export async function fetchTrending(language = '', since = 'daily', maxProjects 
       stars,
       forks,
       starsToday,
-      language,
-      url,
+      language: lang,
+      url: projectUrl,
     });
   });
 

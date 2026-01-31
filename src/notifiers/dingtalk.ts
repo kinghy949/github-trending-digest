@@ -6,8 +6,9 @@
 import crypto from 'crypto';
 import axios from 'axios';
 import { NotifierBase } from './base.js';
+import type { NotifyContent, NotifyOptions } from '../types/index.js';
 
-function buildSignedUrl(webhook, secret) {
+function buildSignedUrl(webhook: string, secret: string): string {
   if (!secret) return webhook;
   const timestamp = Date.now().toString();
   const stringToSign = timestamp + '\n' + secret;
@@ -19,20 +20,17 @@ function buildSignedUrl(webhook, secret) {
 }
 
 export class DingTalkNotifier extends NotifierBase {
-  isConfigured() {
+  isConfigured(): boolean {
     return !!process.env.DINGTALK_WEBHOOK;
   }
 
-  /**
-   * @param {import('./base.js').NotifyContent} content
-   * @param {import('./base.js').NotifyOptions} options
-   */
-  async send(content, options = {}) {
+  async send(content: NotifyContent, _options?: NotifyOptions): Promise<void> {
     const webhook = process.env.DINGTALK_WEBHOOK;
     if (!webhook) throw new Error('未配置 DINGTALK_WEBHOOK');
 
     const url = buildSignedUrl(webhook, process.env.DINGTALK_SECRET || '');
-    const text = content.text || (content.html ? content.html.replace(/<[^>]+>/g, '').trim() : '');
+    const text =
+      content.text || (content.html ? content.html.replace(/<[^>]+>/g, '').trim() : '');
     const body = {
       msgtype: 'markdown',
       markdown: {
