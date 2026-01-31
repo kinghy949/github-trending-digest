@@ -96,8 +96,14 @@ async function main(): Promise<void> {
   });
   console.log('摘要生成完成');
 
+  // 按项目名去重，避免 AI 返回重复项导致邮件内容重复
+  const uniqueSummaryProjects = summary.projects.filter(
+    (p, i, arr) => arr.findIndex((x) => x.name === p.name) === i
+  );
+
   const payload = {
     ...summary,
+    projects: uniqueSummaryProjects,
     rawProjects: projects,
     date: new Date().toLocaleDateString('zh-CN', {
       year: 'numeric',
@@ -113,7 +119,16 @@ async function main(): Promise<void> {
     summary: payload,
   };
 
-  const notifiers = getNotifiers(config.notifyChannels.split(',').map((s) => s.trim()));
+  // 渠道去重，避免同一渠道（如 email）被发送两次
+  const channelNames = [
+    ...new Set(
+      config.notifyChannels
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ];
+  const notifiers = getNotifiers(channelNames);
   if (!notifiers.length) {
     console.warn('没有已配置的通知渠道，请设置 NOTIFY_CHANNELS 及对应环境变量');
     return;
