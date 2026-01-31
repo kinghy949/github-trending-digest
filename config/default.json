@@ -1,0 +1,15 @@
+{
+  "scraper": {
+    "baseUrl": "https://github.com",
+    "maxProjects": 10,
+    "since": "daily"
+  },
+  "summarizer": {
+    "provider": "claude",
+    "language": "zh-CN",
+    "maxProjectsInPrompt": 15
+  },
+  "notifier": {
+    "channels": ["email"]
+  }
+}
